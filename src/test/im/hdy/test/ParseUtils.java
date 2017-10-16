@@ -27,8 +27,15 @@ public class ParseUtils {
         Elements __VIEWSTATE = parse.getElementsByAttributeValue("name", "__VIEWSTATE");
         //获取到第二个数据
         Elements __VIEWSTATEGENERATOR = parse.getElementsByAttributeValue("name", "__VIEWSTATEGENERATOR");
+//        try {
+//            Thread.sleep(10000);
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
         String post = utils.login("2015002530", "hzkjzyjsxy", __VIEWSTATEGENERATOR, __VIEWSTATE);
-        System.err.println(post);
+//        System.err.println(post);
+        String request1 = utils.request("http://jw.hzpt.edu.cn/frame/menu.aspx");
+        System.out.println(request1);
 //        System.out.println(utils.request("http://jw.hzpt.edu.cn/xsxj/Stu_MyInfo_RPT.aspx"));
     }
 }

@@ -168,6 +168,10 @@ public class RequestUtils {
                 System.err.println("elementKey:" + elem.getKey() + " elementValue:" + elem.getValue());
             }
             HttpResponse response = httpclient.execute(httpPost);
+            Header[] allHeaders = response.getAllHeaders();
+            for(int i = 0; i<allHeaders.length;i++){
+                System.err.println(allHeaders[i]);
+            }
             if (response != null) {
                 HttpEntity resEntity = response.getEntity();
                 if (resEntity != null) {
