@@ -49,15 +49,15 @@ public class ParseUtils2 {
                     .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8")
                     .header("Content-Type", "application/x-www-form-urlencoded")
                     .header("Cookie", "ASP.NET_SessionId=" + ASP_NET_SessionId)
-                    .data("fgfggfdgtyuuyyuuckjg", "")
+                    .data("fgfggfdgtyuuyyuuckjg", "E1F5D873F3224A3A122DA593B71FA1")
                     .data("typeName", URLEncoder.encode("学生", "gb2312"))
-                    .data("__VIEWSTATEGENERATOR", __VIEWSTATEGENERATOR.val())
-                    .data("__VIEWSTATE", __VIEWSTATE.val())
+                    .data("__VIEWSTATEGENERATOR", URLEncoder.encode(__VIEWSTATEGENERATOR.val()))
+                    .data("__VIEWSTATE", URLEncoder.encode(__VIEWSTATE.val()))
                     .data("txt_asmcdefsddsd", URLEncoder.encode(username, "gb2312"))
                     .data("pcinfo", "Mozilla%2F5.0+%28Macintosh%3B+Intel+Mac+OS+X+10_13_0%29+AppleWebKit%2F537.36+%28KHTML%2C+like+Gecko%29+Chrome%2F61.0.3163.100+Safari%2F537.36undefined5.0+%28Macintosh%3B+Intel+Mac+OS+X+10_13_0%29+AppleWebKit%2F537.36+%28KHTML%2C+like+Gecko%29+Chrome%2F61.0.3163.100+Safari%2F537.36+SN%3ANULL")
                     .data("txt_pewerwedsdfsdff", "")
                     .data("txt_sdertfgsadscxcadsads", "")
-                    .data("dsdsdsdsdxcxdfgfg",Md5Utils.encrypByMd5(username + (Md5Utils.encrypByMd5(password).toUpperCase().substring(0, 30)) + "13026").substring(0, 30).toUpperCase()).method(Connection.Method.POST);
+                    .data("dsdsdsdsdxcxdfgfg", URLEncoder.encode(Md5Utils.encrypByMd5(username + (Md5Utils.encrypByMd5(password).toUpperCase().substring(0, 30)) + "13026").substring(0, 30).toUpperCase(), "gb2312")).method(Connection.Method.POST);
 
             Map<String, String> cookies =
                     response.cookies();
