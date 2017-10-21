@@ -1,6 +1,8 @@
 package im.hdy.utils;
 
-import jdk.internal.util.xml.impl.Input;
+import im.hdy.entity.Score;
+import im.hdy.entity.ScoreDetail;
+import im.hdy.entity.Semester;
 import org.apache.http.Header;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
@@ -13,7 +15,6 @@ import org.apache.http.cookie.Cookie;
 import org.apache.http.impl.client.AbstractHttpClient;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
-import org.apache.http.protocol.HTTP;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -376,13 +377,14 @@ public class LoginUtils {
      *
      * @return 课表下载地址
      */
-    public static File downloadClass() {
-        HttpGet get = new HttpGet("http://jw.hzpt.edu.cn/xscj/Stu_MyScore_Drawimg.aspx?x=1&h=2&w=747&xnxq=20151&xn=2015&xq=1&rpt=1&rad=2&zfx=0");
+    public static File downloadClass(String url) {
+        HttpGet get = new HttpGet("http://jw.hzpt.edu.cn/xscj/" + url);
         HttpResponse mainHttpResponse = null;
         try {
             mainHttpResponse = client.execute(get);
             InputStream stream = mainHttpResponse.getEntity().getContent();
-            FileOutputStream outputStream = new FileOutputStream("/Users/hdy/Downloads/class");
+            File file = new File("/Users/hdy/Downloads/" + UUID.randomUUID().toString() + ".jpg");
+            FileOutputStream outputStream = new FileOutputStream(file);
             int len = -1;
             byte[] bytes = new byte[2048];
             while ((len = stream.read(bytes)) != -1) {
@@ -391,12 +393,146 @@ public class LoginUtils {
             outputStream.flush();
             outputStream.close();
             stream.close();
-            return new File("/Users/hdy/Downloads/class");
+            return file;
         } catch (IOException e) {
             e.printStackTrace();
         }
         return null;
     }
+
+
+    /**
+     * @param SJ       有效成绩(1)还是原始成绩(0)
+     * @param SelXNXQ  0 入学以来 1学年 2学期
+     * @param zfx_flag 主修0 辅修1
+     * @param sel_xn   学年
+     * @param sel_xq   0第一学期 1第二学期
+     * @apiNote 由于请求的参数比较多.有些参数在某些请求的时候又不需要携带.所以请仔细的看我下面需要的请求
+     * <p>
+     * 入学以来的请求:SJ(默认为0) SelXNXQ:0 zfx_flag(默认为0)
+     * 学年的请求:sel_xn:学年 SJ(默认为0) SelXNXQ:1 zfx_flag(默认为0)
+     * 学期的请求:sel_xn:学年 SJ(默认为0) SelXNXQ:2 zfx_flag(默认为0) sel_xq(默认为0)
+     * </p>
+     */
+    public static Score getScore(int SJ, int SelXNXQ, int zfx_flag, int sel_xn, int sel_xq) {
+        HashMap<String, String> map = new HashMap<>();
+        List<NameValuePair> list = new ArrayList<NameValuePair>();
+        try {
+            map.put("btn_search", URLEncoder.encode("检索", "gb2312"));
+            map.put("zxf", "0");
+            map.put("SJ", SJ + "");
+            map.put("SelXNXQ", SelXNXQ + "");
+            map.put("zfx_flag", zfx_flag + "");
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
+
+        //判断当前的请求类型
+        switch (SelXNXQ) {
+            //入学以来
+            case 0:
+                break;
+            //学年
+            case 1:
+                map.put("sel_xn", sel_xn + "");
+                break;
+            //学期
+            case 2:
+                map.put("sel_xn", sel_xn + "");
+                map.put("sel_xq", sel_xq + "");
+                break;
+            //输入有误
+            default:
+                return null;
+        }
+        if (map != null && !map.isEmpty()) {
+            for (Map.Entry<String, String> entry : map.entrySet()) {
+                list.add(new BasicNameValuePair(entry.getKey(), entry.getValue()));
+            }
+        }
+        try {
+
+            UrlEncodedFormEntity entity = new UrlEncodedFormEntity(list, "gb2312");
+            HttpPost httppost = new HttpPost("http://jw.hzpt.edu.cn/xscj/Stu_MyScore_rpt.aspx");
+            httppost.setHeader("Accept-Encoding", "gzip, deflate, sdch");
+            httppost.setHeader("User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36");
+            httppost.setHeader("Content-Type", "application/x-www-form-urlencoded");
+            httppost.setHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+            httppost.setHeader("Cookie", sb.toString());
+            httppost.setHeader("Referer", "http://jw.hzpt.edu.cn/xscj/Stu_MyScore.aspx");
+            httppost.setHeader("Origin", "http://jw.hzpt.edu.cn/");
+            httppost.setHeader("Host", "jw.hzpt.edu.cn");
+            httppost.setHeader("Connection", "keep-alive");
+
+            httppost.setEntity(entity);
+            HttpResponse httpResponse = client.execute(httppost);
+            int code = httpResponse.getStatusLine().getStatusCode();
+            if (code == 200) {
+                String res = reader(httpResponse.getEntity().getContent(), "gb2312");
+                httppost.abort();
+                Document document = Jsoup.parse(res);
+                //获取到所有的表格
+                Elements tables = document.getElementsByTag("table");
+                //获取所有的成绩表图片地址
+                Elements imgs = document.getElementsByTag("img");
+                //临时的变量.用于学期换个成绩表绑定
+                int temp = 0;
+                Score score = new Score();
+                LinkedList<Semester> semesters = new LinkedList<>();
+                LinkedList<ScoreDetail> scoreDetails = new LinkedList<>();
+
+                Semester semester = null;
+                ScoreDetail scoreDetail = null;
+                for (int i = 0; i < tables.size(); i++) {
+                    Element table = tables.get(i);
+                    if (table.select("tr[valign$=middle]").size() == 1) {
+                        //说明是头.即是杭州科技职业技术学院学生成绩明细.为表格头部
+                        String title = table.select("tr > td").get(0).text();
+                        scoreDetail = new ScoreDetail();
+                        scoreDetail.setTitle(title);
+                    } else if (table.select("tr > td.noborder").size() > 0) {
+                        if (table.select("tr > td > table").size() != 1) {
+                            continue;
+                        }
+                        //说明是页码.为表格尾部
+                        scoreDetail.setSemesters(semesters);
+                        scoreDetails.add(scoreDetail);
+                        semesters = new LinkedList<>();
+
+                    } else if (table.select("tr[$align!=center]").size() == 2) {
+                        //代表是学期表头
+                        scoreDetail = new ScoreDetail();
+                        scoreDetail.setCourtyard(table.select("tr").get(0).getElementsByTag("td").get(0).text());
+                        scoreDetail.setAdministrative_class(table.select("tr").get(0).getElementsByTag("td").get(1).text());
+                        scoreDetail.setStuId(table.select("tr").get(1).getElementsByTag("td").get(0).text());
+                        scoreDetail.setName(table.select("tr").get(1).getElementsByTag("td").get(1).text());
+                        scoreDetail.setTime(table.select("tr").get(1).getElementsByTag("td").get(2).text());
+                    } else {
+                        //说明就是普通的学期了
+                        semester = new Semester();
+                        semester.setTitle(table.select("tr > td[align$=left]").get(0).text());
+                        String src = imgs.get(temp).attr("src");
+                        semester.setImage(downloadClass(src));
+//                new FileOutputStream()
+                        //这里进行课表的下载
+                        semesters.add(semester);
+                        temp++;
+                    }
+                }
+                score.setScoreDetails(scoreDetails);
+                return score;
+            }
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        } catch (ClientProtocolException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
 
     /**
      * 获取用户信息

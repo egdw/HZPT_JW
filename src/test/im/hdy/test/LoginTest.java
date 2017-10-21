@@ -1,5 +1,6 @@
 package im.hdy.test;
 
+import im.hdy.entity.Score;
 import im.hdy.utils.LoginUtils;
 import org.junit.Test;
 
@@ -20,8 +21,9 @@ public class LoginTest {
         String next = scanner.next();
         LoginUtils.login("2015002530", "hzkjzyjsxy", next);
         HashMap<String, String> info = LoginUtils.getUserInfo();
-        File file1 = LoginUtils.downloadClass();
+        Score score = LoginUtils.getScore(0, 0, 0, 2016, 0);
         System.out.println(info);
+        System.out.println(score);
     }
 
     public void test() {
