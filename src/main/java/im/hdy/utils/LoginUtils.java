@@ -1,5 +1,6 @@
 package im.hdy.utils;
 
+import jdk.internal.util.xml.impl.Input;
 import org.apache.http.Header;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
@@ -12,6 +13,11 @@ import org.apache.http.cookie.Cookie;
 import org.apache.http.impl.client.AbstractHttpClient;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.protocol.HTTP;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 
 import java.awt.*;
 import java.io.*;
@@ -366,18 +372,77 @@ public class LoginUtils {
     }
 
     /**
+     * 获取课表
+     *
+     * @return 课表下载地址
+     */
+    public static File downloadClass() {
+        HttpGet get = new HttpGet("http://jw.hzpt.edu.cn/xscj/Stu_MyScore_Drawimg.aspx?x=1&h=2&w=747&xnxq=20151&xn=2015&xq=1&rpt=1&rad=2&zfx=0");
+        HttpResponse mainHttpResponse = null;
+        try {
+            mainHttpResponse = client.execute(get);
+            InputStream stream = mainHttpResponse.getEntity().getContent();
+            FileOutputStream outputStream = new FileOutputStream("/Users/hdy/Downloads/class");
+            int len = -1;
+            byte[] bytes = new byte[2048];
+            while ((len = stream.read(bytes)) != -1) {
+                outputStream.write(bytes, 0, len);
+            }
+            outputStream.flush();
+            outputStream.close();
+            stream.close();
+            return new File("/Users/hdy/Downloads/class");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
      * 获取用户信息
      *
      * @return
      */
-    public static String getUserInfo() {
+    public static HashMap<String, String> getUserInfo() {
         try {
             HttpGet main = new HttpGet("http://jw.hzpt.edu.cn/xsxj/Stu_MyInfo_RPT.aspx");
             HttpResponse mainHttpResponse = null;
             mainHttpResponse = client.execute(main);
             int aa = mainHttpResponse.getStatusLine().getStatusCode();
             String res = reader(mainHttpResponse.getEntity().getContent(), "gb2312");
-            return res;
+            HashMap<String, String> map = new HashMap<>();
+            if (aa == 200) {
+                //说明请求成功
+                Document document = Jsoup.parse(res);
+                Elements trs = document.getElementsByTag("tr");
+                Iterator<Element> iterator = trs.iterator();
+                while (iterator.hasNext()) {
+                    Element element = iterator.next();
+                    Elements tds = element.getElementsByTag("td");
+                    //如果数量为一的都是有问题的.不需要遍历
+                    if (tds.size() != 1) {
+                        //说明是偶数
+                        String key = null;
+                        String value = null;
+                        for (int i = 0; i < tds.size(); i++) {
+                            if (i % 2 == 0) {
+                                //说明是key
+                                key = tds.get(i).text().trim();
+                                System.out.println();
+                            } else {
+                                //说明是Value
+                                value = tds.get(i).text();
+                                if (value == null || value.equals("")) {
+                                    value = "暂无数据";
+                                }
+                                map.put(key, value);
+                            }
+                        }
+                    }
+                }
+                map.put("头像", "http://jw.hzpt.edu.cn" + document.getElementsByTag("img").get(0).attr("src").substring(2));
+            }
+            return map;
         } catch (IOException e) {
             e.printStackTrace();
         }
