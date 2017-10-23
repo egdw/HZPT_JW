@@ -373,11 +373,11 @@ public class LoginUtils {
     }
 
     /**
-     * 获取课表
+     * 获取成绩
      *
-     * @return 课表下载地址
+     * @return 成绩下载地址
      */
-    public static File downloadClass(String url) {
+    private static File downloadScore(String url) {
         HttpGet get = new HttpGet("http://jw.hzpt.edu.cn/xscj/" + url);
         HttpResponse mainHttpResponse = null;
         try {
@@ -400,6 +400,33 @@ public class LoginUtils {
         return null;
     }
 
+    /**
+     * 下载考试安排表
+     *
+     * @return 安排表下载地址
+     */
+    private static File downloadExam(String url) {
+        HttpGet get = new HttpGet("http://jw.hzpt.edu.cn/KSSW/" + url);
+        HttpResponse mainHttpResponse = null;
+        try {
+            mainHttpResponse = client.execute(get);
+            InputStream stream = mainHttpResponse.getEntity().getContent();
+            File file = new File("/Users/hdy/Downloads/" + UUID.randomUUID().toString() + ".jpg");
+            FileOutputStream outputStream = new FileOutputStream(file);
+            int len = -1;
+            byte[] bytes = new byte[2048];
+            while ((len = stream.read(bytes)) != -1) {
+                outputStream.write(bytes, 0, len);
+            }
+            outputStream.flush();
+            outputStream.close();
+            stream.close();
+            return file;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 
     /**
      * @param SJ       有效成绩(1)还是原始成绩(0)
@@ -513,7 +540,7 @@ public class LoginUtils {
                         semester = new Semester();
                         semester.setTitle(table.select("tr > td[align$=left]").get(0).text());
                         String src = imgs.get(temp).attr("src");
-                        semester.setImage(downloadClass(src));
+                        semester.setImage(downloadScore(src));
 //                new FileOutputStream()
                         //这里进行课表的下载
                         semesters.add(semester);
@@ -535,6 +562,91 @@ public class LoginUtils {
 
 
     /**
+     * 获取考试安排时间
+     * <p>
+     * sel_xnxq 学年学期 20161
+     *
+     * @param sel_lcxz 考试轮次性质 3中考 2末考 1补考
+     *                 sel_lc   考试轮次 null默认 2016102 猜测和学年有一些关系
+     */
+    public static void getExam(int sel_lcxz) {
+        HttpGet main = new HttpGet("http://jw.hzpt.edu.cn/KSSW/stu_ksap.aspx");
+        try {
+            HttpResponse mainHttpResponse = null;
+            mainHttpResponse = client.execute(main);
+            int code = mainHttpResponse.getStatusLine().getStatusCode();
+            String res = reader(mainHttpResponse.getEntity().getContent(), "gb2312");
+            main.abort();
+            if (code == 200) {
+                //从文档当中获取sel_xnxq参数.以此来动态的获取当前的学年而不是通过写死的方式.
+                Document document = Jsoup.parse(res);
+                Elements options = document.getElementsByTag("option");
+                //获取当前的学年
+                String sel_xnxq = null;
+                //获取当前的
+                String sel_lc = null;
+                for (int i = 0; i < options.size(); i++) {
+                    Element element = options.get(i);
+                    if (element.text().contains("学年")) {
+                        sel_xnxq = element.val();
+                        sel_lc = sel_xnxq + "02";
+                    }
+                }
+                HashMap<String, String> map = new HashMap<>();
+                List<NameValuePair> list = new ArrayList<NameValuePair>();
+                try {
+                    map.put("btn_search", URLEncoder.encode("检索", "gb2312"));
+                    map.put("sel_xnxq", sel_xnxq);
+                    map.put("sel_lcxz", sel_lcxz + "");
+                    map.put("sel_lc", sel_lc);
+                } catch (UnsupportedEncodingException e) {
+                    e.printStackTrace();
+                }
+                if (map != null && !map.isEmpty()) {
+                    for (Map.Entry<String, String> entry : map.entrySet()) {
+                        list.add(new BasicNameValuePair(entry.getKey(), entry.getValue()));
+                    }
+                }
+
+                UrlEncodedFormEntity entity = new UrlEncodedFormEntity(list, "gb2312");
+                HttpPost httppost = new HttpPost("http://jw.hzpt.edu.cn/KSSW/stu_ksap_rpt.aspx");
+                httppost.setHeader("Accept-Encoding", "gzip, deflate, sdch");
+                httppost.setHeader("User-Agent",
+                        "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36");
+                httppost.setHeader("Content-Type", "application/x-www-form-urlencoded");
+                httppost.setHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+                httppost.setHeader("Cookie", sb.toString());
+                httppost.setHeader("Referer", "http://jw.hzpt.edu.cn/KSSW/stu_ksap.aspx");
+                httppost.setHeader("Origin", "http://jw.hzpt.edu.cn/");
+                httppost.setHeader("Host", "jw.hzpt.edu.cn");
+                httppost.setHeader("Connection", "keep-alive");
+
+                httppost.setEntity(entity);
+                HttpResponse httpResponse = client.execute(httppost);
+                if (httpResponse.getStatusLine().getStatusCode() == 200) {
+                    String r = reader(httpResponse.getEntity().getContent(), "gb2312");
+                    httppost.abort();
+                    Document document2 = Jsoup.parse(r);
+                    Elements imgs = document2.getElementsByTag("img");
+                    //获取考试安排图片
+                    Element element = null;
+                    for (int i = 0; i < imgs.size(); i++) {
+                        element = imgs.get(i);
+                        if (element.text().contains("stu_ksap_drawimg.aspx")) {
+                            break;
+                        }
+                    }
+                    String src = element.attr("src");
+                    File file = downloadExam(src);
+                }
+
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
      * 获取用户信息
      *
      * @return
@@ -547,6 +659,7 @@ public class LoginUtils {
             int aa = mainHttpResponse.getStatusLine().getStatusCode();
             String res = reader(mainHttpResponse.getEntity().getContent(), "gb2312");
             HashMap<String, String> map = new HashMap<>();
+            main.abort();
             if (aa == 200) {
                 //说明请求成功
                 Document document = Jsoup.parse(res);
@@ -583,5 +696,32 @@ public class LoginUtils {
             e.printStackTrace();
         }
         return null;
+    }
+
+    /**
+     * 判断当前是否已经登录
+     *
+     * @return
+     */
+    public static boolean isLogin() {
+        try {
+            HttpGet main = new HttpGet("http://jw.hzpt.edu.cn/PUB/foot.aspx");
+            HttpResponse mainHttpResponse = null;
+            mainHttpResponse = client.execute(main);
+            int aa = mainHttpResponse.getStatusLine().getStatusCode();
+            String res = reader(mainHttpResponse.getEntity().getContent(), "gb2312");
+            main.abort();
+            if (aa == 200) {
+                Document document = Jsoup.parse(res);
+                Element theFootMemo = document.getElementById("TheFootMemo");
+                boolean contains = theFootMemo.text().contains("学生");
+                return contains;
+            } else {
+                return false;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 }
